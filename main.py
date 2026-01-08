@@ -80,15 +80,35 @@ def update_message(text_id):
 
 
 
-def gerar_transcricao(mp3_local_filename):
-
-        # Define o caminho do arquivo MP4 local que será convertido
-        mp4_local_filename = "YTDown.com_YouTube_Media_7L9A6KhIpDA_006_144p.mp4"
-
-        # Chama a função para converter o arquivo MP4 em MP3
-        mp4_to_mp3(mp4_local_filename, mp3_local_filename)
-
-
+def gerar_transcricao(uploaded_file, mp3_local_filename):
+        """Gera transcrição a partir de um arquivo MP4 ou MP3 enviado pelo usuário."""
+        
+        # Detecta o tipo de arquivo enviado
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        # Se for MP4, converte para MP3
+        if file_extension == "mp4":
+            # Salva o arquivo MP4 temporariamente
+            temp_mp4 = f"temp_{uuid.uuid4().hex}.mp4"
+            with open(temp_mp4, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Converte MP4 para MP3
+            mp4_to_mp3(temp_mp4, mp3_local_filename)
+            
+            # Remove o arquivo MP4 temporário
+            import os
+            os.remove(temp_mp4)
+        
+        elif file_extension == "mp3":
+            # Se for MP3, salva direto com o nome esperado
+            with open(mp3_local_filename, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+        
+        else:
+            st.error(f"Formato de arquivo não suportado: {file_extension}. Use MP4 ou MP3.")
+            return
+        
         # Defina sua chave de API fornecida pelo AssemblyAI. Isso é essencial para autenticação.
         aai.settings.api_key = "617454231d6f40d7b1ab95fb818b5d3c"
 
@@ -177,27 +197,36 @@ def preencher_pagina(mp3_local_filename):
 # Verifica se o script está sendo executado como o programa principal
 if __name__ == "__main__":
 
+    st.title("📝 Corretor de Transcrições")
+    
     # Gera um nome de arquivo único para o arquivo MP3 usando uuid para evitar colisões de nome
     if "mp3_local_filename" not in st.session_state:
         st.session_state.mp3_local_filename = f"{uuid.uuid4().hex}.mp3"
 
+    # Se ainda não há mensagens (transcrições), permite upload
     if "messages" not in st.session_state:
-        with st.spinner("Gerando transcrição...", show_time=True):
-            gerar_transcricao(st.session_state.mp3_local_filename)
+        st.subheader("📤 Enviar arquivo de áudio")
+        uploaded_file = st.file_uploader(
+            "Envie um arquivo MP4 ou MP3",
+            type=["mp4", "mp3"],
+            help="Você pode enviar um arquivo de vídeo (MP4) ou áudio (MP3)"
+        )
+        
+        if uploaded_file is not None:
+            with st.spinner("Gerando transcrição...", show_time=True):
+                gerar_transcricao(uploaded_file, st.session_state.mp3_local_filename)
 
-        total_frases = len(st.session_state.messages)
+            if st.session_state.messages:
+                total_frases = len(st.session_state.messages)
 
-        my_bar = st.progress(0, text="Validação em curso. Por favor, espere!")
-        # Iterate over the generator to update the progress bar
-        for frases_validadas in validar_sentencas():
-            my_bar.progress(frases_validadas / total_frases, text=f"Validação em curso. Por favor, espere! ({frases_validadas}/{total_frases})")
+                my_bar = st.progress(0, text="Validação em curso. Por favor, espere!")
+                # Iterate over the generator to update the progress bar
+                for frases_validadas in validar_sentencas():
+                    my_bar.progress(frases_validadas / total_frases, text=f"Validação em curso. Por favor, espere! ({frases_validadas}/{total_frases})")
 
-
-        preencher_pagina(st.session_state.mp3_local_filename)
+                st.success(f"✅ Transcrição concluída! {total_frases} frases validadas.")
+                st.rerun()
 
     else:
         preencher_pagina(st.session_state.mp3_local_filename)
-        pass
-
-    # st.write(st.session_state["messages"])
 
