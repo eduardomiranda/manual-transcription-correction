@@ -15,6 +15,8 @@ import assemblyai as aai
 import streamlit as st
 
 
+from sentence_analyzer import validate_sentence
+
 
 # Define uma função chamada 'mp4_to_mp3' que converte um arquivo MP4 em formato MP3
 def mp4_to_mp3(mp4, mp3):
@@ -108,6 +110,19 @@ def gerar_transcricao(mp3_local_filename):
 
 
 
+def validar_sentencas():
+    i = 0
+    if "validacao" not in st.session_state:
+        st.session_state.validacao = {}
+
+    for text_id, utterance in st.session_state.messages.items():
+        st.session_state.validacao[text_id] = validate_sentence(utterance.text)
+        i += 1
+        yield i
+
+
+
+
 
 def preencher_pagina(mp3_local_filename):
 
@@ -119,14 +134,41 @@ def preencher_pagina(mp3_local_filename):
             # Exibe o número do falante e o texto correspondente.
             st.write(f"Speaker {utterance.speaker}: {utterance.text}")
 
-            col11, col12 = st.columns(2)
+            frase_incorreta = False
+
+            col11, col12, col13 = st.columns(3)
             with col11:
-                st.audio(mp3_local_filename, format="audio/mpeg", start_time=utterance.start/1000)
+                if st.session_state.validacao[text_id]["frase_correta"]:
+                    st.badge("Frase correta", icon=":material/check:", color="green")
+                else:
+                    st.markdown(":orange-badge[⚠️ Frase incorreta]")
+                    frase_incorreta = True
             with col12:
-                with st.popover("Atualizar texto"):
-                    st.markdown("Insira o texto correto")
-                    st.text_area("Novo texto", value=utterance.text, key=f"textarea_{text_id}")
-                    st.button('📨 Atualizar', key=f"btn_{uuid.uuid4().hex}", on_click=update_message, kwargs={"text_id": text_id})
+                st.audio(mp3_local_filename, format="audio/mpeg", start_time=utterance.start/1000)
+            with col13:
+                with st.popover("Atualizar frase"):
+                    # st.markdown("Insira a frase correta")
+                    st.text_area("Insira a frase correta", value=utterance.text, key=f"textarea_{text_id}")
+                    st.button('✏️ Atualizar', key=f"btn_{uuid.uuid4().hex}", on_click=update_message, kwargs={"text_id": text_id})
+            
+            if frase_incorreta:
+                # st.json(st.session_state.validacao[text_id])
+                if st.session_state.validacao[text_id]["ortografia"]["status"] != "ok":
+                    st.badge("Ortografia incorreta", icon=":material/check:", color="red")
+                    for problema in st.session_state.validacao[text_id]["ortografia"]["problemas"]:
+                        st.write(f"- {problema}")
+
+                if st.session_state.validacao[text_id]["gramatica"]["status"] != "ok":
+                    st.badge("Gramática incorreta", icon=":material/check:", color="red")
+                    for problema in st.session_state.validacao[text_id]["gramatica"]["problemas"]:
+                        st.write(f"- {problema}")
+
+                if st.session_state.validacao[text_id]["semantica"]["status"] != "ok":
+                    st.badge("Semântica incorreta", icon=":material/check:", color="red")
+                    for problema in st.session_state.validacao[text_id]["semantica"]["problemas"]:
+                        st.write(f"- {problema}")
+
+            st.divider()
 
     
 
@@ -140,7 +182,17 @@ if __name__ == "__main__":
         st.session_state.mp3_local_filename = f"{uuid.uuid4().hex}.mp3"
 
     if "messages" not in st.session_state:
-        gerar_transcricao(st.session_state.mp3_local_filename)
+        with st.spinner("Gerando transcrição...", show_time=True):
+            gerar_transcricao(st.session_state.mp3_local_filename)
+
+        total_frases = len(st.session_state.messages)
+
+        my_bar = st.progress(0, text="Validação em curso. Por favor, espere!")
+        # Iterate over the generator to update the progress bar
+        for frases_validadas in validar_sentencas():
+            my_bar.progress(frases_validadas / total_frases, text=f"Validação em curso. Por favor, espere! ({frases_validadas}/{total_frases})")
+
+
         preencher_pagina(st.session_state.mp3_local_filename)
 
     else:
