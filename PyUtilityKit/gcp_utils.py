@@ -15,12 +15,12 @@ def get_storage_client():
 
 
 
-def upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_file_path, bucket_file_name):
+def upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_file, bucket_file_name):
     """
     Uploads a file to a specified Google Cloud Storage bucket.
     
     :param bucket_name: Name of the GCP bucket
-    :param local_file_path: Local path to the file
+    :param local_file: Local file object to upload
     :param bucket_file_name: The name the file will have in the bucket
     """
 
@@ -33,8 +33,8 @@ def upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_fi
 
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(bucket_file_name)
-        blob.upload_from_filename(local_file_path)
-        print(f"File {local_file_path} uploaded to {bucket_name}/{bucket_file_name}.")
+        blob.upload_from_file(local_file) # Use upload_from_file to handle the file-like object directly
+        print(f"File {local_file} uploaded to {bucket_name}/{bucket_file_name}.")
     except Exception as ex:
         print(f"An error occurred: {ex}")
 

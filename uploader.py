@@ -159,8 +159,8 @@ if uploaded_file :
 		file_extension = Path(file_name).suffix
 
 		st.session_state.transcricao_filename = file_utils.generate_random_filename(length=32, extension=file_extension)
-		with open(st.session_state.transcricao_filename, 'wb') as file: 
-			file.write(uploaded_file.read())
+		# with open(st.session_state.transcricao_filename, 'wb') as file: 
+		# 	file.write(uploaded_file.read())
 
 
 	with st.form(key='my_form', clear_on_submit = True):			
@@ -207,10 +207,10 @@ if uploaded_file :
 						if flag_dados_enviados_mongo :
 							try:
 								# Envia para o bucket no GCP
-								local_file_path  = st.session_state.transcricao_filename
+								local_file  = uploaded_file
 								bucket_file_name = st.session_state.transcricao_filename
 
-								gcp_utils.upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_file_path, bucket_file_name)
+								gcp_utils.upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_file, bucket_file_name)
 								flag_envio_comprovante_bucket = True
 
 							except Exception as e:
@@ -234,12 +234,13 @@ if uploaded_file :
 								logger.error(f"Um erro ocorreu na tentativa de envio da confirmação por e-mail.")
 								logger.error(f"{e}")
 
-						# Deleta localmente o arquivo utilizado
-						file_utils.delete_file_if_exists(st.session_state.transcricao_filename)
-
-
 				else: st.warning('e-mail incorreto!', icon="⚠️")
 			else: st.warning('Foram localizados campos sem preenchimento!', icon="⚠️")
+
+
+# Deleta localmente o arquivo utilizado
+if 'transcricao_filename' in st.session_state:
+	file_utils.delete_file_if_exists(st.session_state.transcricao_filename)
 
 
 
