@@ -18,8 +18,11 @@ from PyUtilityKit import email_utils
 from PyUtilityKit import mongo_utils
 from PyUtilityKit import logging_utils
 
+from newrelic_utils import set_newrelic_license_key
+
 import newrelic.agent
-# newrelic.agent.initialize('newrelic.ini', env.lower(),  ignore_errors=False)
+from newrelic.agent import NewRelicContextFormatter
+
 
 
 timezone = st.secrets['system'].get("timezone", '')
@@ -35,9 +38,28 @@ sender        = st.secrets['email'].get('sender', '')
 password      = st.secrets['email'].get('password', '')
 destinatarios = st.secrets['email'].get('destinatarios', '')
 
+newrelic_license_key = st.secrets['newrelic'].get('license_key', '')
+# newrelic_app_name    = st.secrets['newrelic'].get('app_name', '')
+
+
+if "NEW_RELIC_INITIALIZED" not in st.session_state:
+
+	try:
+		set_newrelic_license_key(ini_path="newrelic.ini", license_key=newrelic_license_key)
+		newrelic.agent.initialize('newrelic.ini', ignore_errors=False)
+
+		print("Agente New Relic inicializado com sucesso.")
+		st.session_state["NEW_RELIC_INITIALIZED"] = True
+
+	except RuntimeError as e:
+		print(f"Erro ao inicializar o agente New Relic: {e}")
+		st.session_state["NEW_RELIC_INITIALIZED"] = False
+
+
 
 logging_utils.iniciaLogging('logs/uploader.log', logging.INFO, '' )
 logger = logging.getLogger('')
+
 
 
 def estao_todos_campos_preenchidos(**kwargs):
@@ -131,18 +153,16 @@ def criar_html_de_confirmacao_de_recebimento(nome_terapeuta, nome_paciente, data
 
 st.image("brainncare.png")
 st.markdown(":small[*Desenvolvido com foco em ética clínica, responsabilidade profissional e segurança da informação.*]")
-# st.title("Brainn Care")
 st.markdown(":small[Este espaço destina-se ao envio de transcrições de atendimentos psicológicos presenciais, com a finalidade de **apoio à organização do conteúdo clínico e à reflexão técnica do(a) psicólogo(a)**.]")
-# st.markdown('A Brainn Care atua como uma **ferramenta de suporte ao raciocínio clínico**, sem substituir a escuta, o julgamento técnico ou a responsabilidade ética do(a) psicólogo(a).')
-st.markdown(':small[A Brainn.Care atua como **ferramenta de suporte**, não substituindo a escuta clínica, o raciocínio psicológico, a autonomia profissional nem a responsabilidade técnica do(a) psicólogo(a), conforme previsto no Código de Ética Profissional do Psicólogo.]')
 st.markdown(":small[Todo o conteúdo enviado é tratado com **confidencialidade**, respeitando os princípios do sigilo profissional e a legislação vigente (LGPD).]")
+
+# st.markdown('A Brainn Care atua como uma **ferramenta de suporte ao raciocínio clínico**, sem substituir a escuta, o julgamento técnico ou a responsabilidade ética do(a) psicólogo(a).')
 
 # st.subheader("Como funciona", divider="gray")
 with st.expander("📌 Como funciona"):
 	st.markdown("- :small[Você envia a gravação da sessão presencial.]")
 	st.markdown("- :small[A Brainn Care trabalha na transcrição desta gravação e disponibiliza na plataforma.]")
-	st.markdown("- :small[Com isso, a Brainn Care pode gerar insumos clínicos auxiliares, como resumos, observações descritivas e hipóteses não diagnósticas.]")
-	st.markdown("- :small[Nenhuma decisão clínica é tomada automaticamente. Todo o material gerado deve ser avaliado criticamente pelo profissional.]")
+	st.markdown("- :small[Assim que a transcrição for disponibilizada, você receberá uma notificação por e-mail ou Whatsapp.]")
 
 st.divider()
 
@@ -196,6 +216,7 @@ if uploaded_file :
 							"status_processamento": False }
 
 							mongo_utils.salva_no_mongo( mongodb_uri, mongodb_db, mongodb_collection, dados )
+							logger.info('Dados salvos no MongoDB')
 							flag_dados_enviados_mongo = True
 
 						except Exception as e:
@@ -211,6 +232,7 @@ if uploaded_file :
 								bucket_file_name = st.session_state.transcricao_filename
 
 								gcp_utils.upload_file_to_gcp_bucket(service_account_json_string, bucket_name, local_file, bucket_file_name)
+								logger.info('Upload realizado para o GCP com sucesso')
 								flag_envio_comprovante_bucket = True
 
 							except Exception as e:
@@ -228,6 +250,7 @@ if uploaded_file :
 								email_utils.enviar_html_email(subject, text_body_message, html_body_message, sender, password, destinatarios + [email_terapeuta], None)
 								st.success('Sessão recebida com sucesso!', icon="✅")
 								st.markdown("Agora você pode utilizar os recursos da Brainn Care para organizar, refletir e apoiar sua análise clínica, sempre mantendo seu julgamento profissional como referência principal.")
+								logger.info('Email enviado com sucesso')
 
 							except Exception as e:
 								st.error('Um erro ocorreu ao tentar enviar a transcrição [Código do erro: 42CB].', icon="🚨")
@@ -245,10 +268,40 @@ if 'transcricao_filename' in st.session_state:
 
 
 with st.expander("🤝 Finalidade e natureza do material gerado"):
-	st.markdown(':small[Os materiais eventualmente produzidos a partir da transcrição possuem caráter auxiliar, descritivo e organizacional, podendo incluir sínteses do conteúdo e hipóteses clínicas não diagnósticas.]')
-	st.markdown(':small[Tais materiais não configuram documentos psicológicos formais, nos termos da Resolução CFP nº 06/2019, e não substituem registros clínicos, pareceres, laudos ou relatórios elaborados pelo(a) profissional.]')
-	st.markdown(':small[A Brainn.Care **não realiza diagnósticos psicológicos, não emite conclusões clínicas finais** e** não substitui processos avaliativos**, os quais são atribuições exclusivas do(a) psicólogo(a).]')
-	st.markdown(':small[Qualquer hipótese apresentada deve ser compreendida como **subsídio técnico preliminar**, cabendo exclusivamente ao(a) profissional a análise crítica, validação e decisão sobre seu uso.]')
+    st.markdown(
+        ':small['
+        'Os materiais gerados a partir da transcrição possuem caráter **auxiliar, descritivo e organizacional**, '
+        'podendo incluir sínteses do conteúdo e **hipóteses clínicas não diagnósticas**, com a finalidade de apoiar a reflexão profissional.'
+        ']'
+    )
+
+    st.markdown(
+        ':small['
+        'Esses materiais **não configuram documentos psicológicos formais**, não substituem registros clínicos '
+        'nem equivalem a pareceres, laudos ou relatórios elaborados pelo(a) psicólogo(a).'
+        ']'
+    )
+
+    st.markdown(
+        ':small['
+        'A Brainn.Care atua como um **assistente clínico inteligente**, '
+        '**não realizando diagnósticos, não emitindo conclusões clínicas finais e não conduzindo decisões clínicas**.'
+        ']'
+    )
+
+    st.markdown(
+        ':small['
+        'Eventuais hipóteses apresentadas devem ser compreendidas como **subsídios técnicos preliminares**, '
+        'cabendo exclusivamente ao(a) profissional a análise crítica, validação e decisão sobre seu uso.'
+        ']'
+    )
+
+    st.markdown(
+        ':small['
+        'O uso do material gerado **não substitui a escuta clínica, o raciocínio psicológico, '
+        'a autonomia profissional nem a responsabilidade técnica** do(a) psicólogo(a).'
+        ']'
+    )
 
 
 # st.subheader("Confidencialidade e proteção de dados", divider="blue")
