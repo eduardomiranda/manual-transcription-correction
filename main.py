@@ -110,7 +110,12 @@ def gerar_transcricao(uploaded_file, mp3_local_filename):
             return
         
         # Defina sua chave de API fornecida pelo AssemblyAI. Isso é essencial para autenticação.
-        aai.settings.api_key = "617454231d6f40d7b1ab95fb818b5d3c"
+        import os
+        api_key = os.getenv("ASSEMBLYAI_API_KEY")
+        if not api_key:
+            st.error("❌ Erro: Variável de ambiente ASSEMBLYAI_API_KEY não configurada. Configure no Streamlit Cloud.")
+            return
+        aai.settings.api_key = api_key
 
         # Chama a função de transcrição com as configurações desejadas.
         transcript = mp3_to_text(
