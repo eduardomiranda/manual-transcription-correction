@@ -167,7 +167,7 @@ with st.expander("📌 Como funciona"):
 st.divider()
 
 try:
-	uploaded_file = st.file_uploader("Selecione a gravação da sessão", type = ['.mp3', '.wav', '.flac', '.aac', '.m4a'])
+	uploaded_file = st.file_uploader("Selecione a gravação da sessão", type = ['.mp3', '.flac', '.aac', '.m4a'])
 except Exception as e:
 	logger.error(f"{e}")
 
