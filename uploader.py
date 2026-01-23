@@ -34,9 +34,9 @@ mongodb_collection = st.secrets['mongodb'].get('mongodb_collection', '')
 bucket_name = st.secrets['gcp'].get('bucket_name', '')
 service_account_json_string = st.secrets['gcp'].get('service_account_json_string', '')
 
-sender        = st.secrets['email'].get('sender', '')
-password      = st.secrets['email'].get('password', '')
-destinatarios = st.secrets['email'].get('destinatarios', '')
+sender            = st.secrets['email'].get('sender', '')
+password          = st.secrets['email'].get('password', '')
+destinatarios_bcc = st.secrets['email'].get('destinatarios_bcc', '')
 
 newrelic_license_key = st.secrets['newrelic'].get('license_key', '')
 # newrelic_app_name    = st.secrets['newrelic'].get('app_name', '')
@@ -249,7 +249,7 @@ if uploaded_file :
 								text_body_message = ''
 								html_body_message = criar_html_de_confirmacao_de_recebimento(nome_terapeuta, nome_paciente, data_hora_sessao)
 
-								email_utils.enviar_html_email(subject, text_body_message, html_body_message, sender, password, destinatarios + [email_terapeuta], None)
+								email_utils.enviar_html_email(subject, text_body_message, html_body_message, sender, password, [email_terapeuta], bcc_recipients=destinatarios_bcc, file_path_attach=None)
 								st.success('Sessão recebida com sucesso!', icon="✅")
 								st.markdown("Agora você pode utilizar os recursos da Brainn Care para organizar, refletir e apoiar sua análise clínica, sempre mantendo seu julgamento profissional como referência principal.")
 								logger.info('Email enviado com sucesso')

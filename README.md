@@ -21,7 +21,7 @@ source  myvenv/bin/activate
 
 # Execução do painel Streamlit
 ```sh
-streamlit run main.py 
+streamlit run uploader.py 
 ```
 
 
